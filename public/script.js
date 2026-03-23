@@ -227,4 +227,17 @@ function abrirModal(t,i,...a){const m=document.getElementById('editModal');const
 function fecharModal(){document.getElementById('editModal').style.display='none'}
 async function confirmarEdicao(){const{t,i}=ec;let b={},r='',cb=null;if(t==='servico'){b={nome:document.getElementById('en').value,preco:document.getElementById('ep').value,custo:document.getElementById('ec').value};r=`/api/servicos/${i}`;cb=loadServ;}if(t==='funcionario'){b={nome:document.getElementById('en').value};r=`/api/funcionarios/${i}`;cb=loadFunc;}if(t==='despesa'){b={descricao:document.getElementById('ed').value,valor:document.getElementById('ev').value,categoria:document.getElementById('ec').value};r=`/api/despesas/${i}`;cb=loadDesp;}if(t==='transacao'){b={valor_cobrado:document.getElementById('ev').value,forma_pagamento:document.getElementById('ep').value};r=`/api/transacoes/${i}`;cb=loadExt;}await fetch(r,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});fecharModal();cb();}
 
-document.addEventListener('DOMContentLoaded', () => loadDash());
+async function carregarIpRede() {
+    try {
+        const res = await fetch(`${API}/rede`);
+        const data = await res.json();
+        document.getElementById('ip-display').innerText = `http://${data.ip}:${data.porta}`;
+    } catch(e) {
+        document.getElementById('ip-display').innerText = "Indisponível";
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => { 
+    loadDash(); 
+    carregarIpRede(); 
+});

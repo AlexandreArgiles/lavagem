@@ -289,6 +289,43 @@ app.get('/api/rh/extrato', checkAuth, checkAdmin, (req, res) => {
 });
 app.delete('/api/rh/:id', checkAuth, checkAdmin, (req, res) => { db.run("DELETE FROM rh_eventos WHERE id=?", [req.params.id], () => res.json({success:true})); });
 
+// ================== REDE LOCAL ==================
+app.get('/api/rede', (req, res) => {
+    const os = require('os');
+    const interfaces = os.networkInterfaces();
+    let localIp = 'localhost';
+    
+    for (let name of Object.keys(interfaces)) {
+        for (let iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                localIp = iface.address;
+            }
+        }
+    }
+    res.json({ ip: localIp, porta: 3000 });
+});
 // ================== START SERVER ==================
+const os = require('os');
 const PORT = 3000;
-app.listen(PORT, () => console.log(`🚀 Backend rodando na porta ${PORT}`));
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Backend rodando na porta ${PORT}`);
+    
+    // Identifica o IP local (IPv4) da sua máquina na rede Wi-Fi/Cabo
+    const interfaces = os.networkInterfaces();
+    let localIp = 'localhost';
+    
+    for (let name of Object.keys(interfaces)) {
+        for (let iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                localIp = iface.address;
+            }
+        }
+    }
+    
+    console.log(`\n=================================================`);
+    console.log(`🌐 ACESSO PELA REDE LOCAL (Celular, Tablet, etc)`);
+    console.log(`Abra o navegador no outro aparelho e digite:`);
+    console.log(`➡️  http://${localIp}:${PORT}`);
+    console.log(`=================================================\n`);
+});

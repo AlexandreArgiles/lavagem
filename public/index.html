@@ -5,13 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SpumaCar System</title>
     
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http://localhost:3000; connect-src 'self' ws: http://localhost:3000;">
-    
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: *; connect-src 'self' ws: *;">    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <nav class="sidebar">
         <div class="sidebar-header"><div class="brand">💧 SpumaCar</div><div id="user-display" class="user-info">Carregando...</div></div>
+        <nav class="sidebar">
+        <div class="sidebar-header">
+            <div class="brand">💧 SpumaCar</div>
+            <div id="user-display" class="user-info">Carregando...</div>
+            
+            <div style="margin-top: 15px; padding: 10px; background: #e0f2fe; border: 1px dashed #0ea5e9; border-radius: 8px; text-align: center;">
+                <span style="font-size: 0.75rem; color: #0284c7; font-weight: bold;">📱 ACESSO EXTERNO (REDE)</span><br>
+                <span id="ip-display" style="font-size: 0.9rem; color: #0f172a; font-weight: bold; user-select: all;">Carregando...</span>
+            </div>
+            </div>
         <div class="sidebar-nav">
             <button onclick="navTo('dashboard')" class="nav-btn active">📊 Visão Geral</button>
             <button onclick="navTo('patio')" class="nav-btn">🚗 Pátio</button>
