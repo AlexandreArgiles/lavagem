@@ -38,6 +38,10 @@ db.serialize(() => {
     )`);
     // Tenta adicionar a coluna obs caso o banco já exista (ignora o erro se a coluna já estiver lá)
     db.run(`ALTER TABLE transacoes ADD COLUMN obs TEXT`, (err) => {});
+    db.run(`ALTER TABLE transacoes ADD COLUMN servico_extra TEXT`, (err) => {});
+    db.run(`ALTER TABLE transacoes ADD COLUMN valor_extra REAL DEFAULT 0`, (err) => {});
+    db.run(`ALTER TABLE agendamentos ADD COLUMN servico_extra TEXT`, (err) => {});
+    db.run(`ALTER TABLE agendamentos ADD COLUMN valor_extra REAL DEFAULT 0`, (err) => {});
 
     db.run(`CREATE TABLE IF NOT EXISTS despesas (id INTEGER PRIMARY KEY AUTOINCREMENT, descricao TEXT NOT NULL, valor REAL NOT NULL, data_despesa DATE DEFAULT CURRENT_DATE, categoria TEXT)`);
 

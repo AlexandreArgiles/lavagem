@@ -71,14 +71,15 @@ app.get('/api/check-session', (req, res) => {
 
 // ================== OPERACIONAL (CADASTRO INTELIGENTE) ==================
 app.post('/api/lavagem-rapida', checkAuth, (req, res) => {
-    const { placa, modelo, nome, telefone, servico_id, funcionario_id, valor, pgto, obs } = req.body;
+    // Adicionado servico_extra e valor_extra
+    const { placa, modelo, nome, telefone, servico_id, funcionario_id, valor, pgto, obs, servico_extra, valor_extra } = req.body;
     
     db.get("SELECT id FROM clientes WHERE nome = ?", [nome], (err, cliente) => {
         const processarVeiculo = (clienteId) => {
             db.get("SELECT id FROM veiculos WHERE placa = ?", [placa], (err, veiculo) => {
                 const registrarTransacao = (veiculoId) => {
-                    db.run("INSERT INTO transacoes (cliente_id, veiculo_id, placa_registrada, servico_id, funcionario_id, valor_cobrado, forma_pagamento, obs) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    [clienteId, veiculoId, placa, servico_id, funcionario_id, valor, pgto, obs], (err) => {
+                    db.run("INSERT INTO transacoes (cliente_id, veiculo_id, placa_registrada, servico_id, funcionario_id, valor_cobrado, forma_pagamento, obs, servico_extra, valor_extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [clienteId, veiculoId, placa, servico_id, funcionario_id, valor, pgto, obs, servico_extra, valor_extra || 0], (err) => {
                         if (err) return res.status(500).json({ error: err.message });
                         res.json({ success: true });
                     });
@@ -95,16 +96,23 @@ app.post('/api/lavagem-rapida', checkAuth, (req, res) => {
             db.run("INSERT INTO clientes (nome, telefone) VALUES (?, ?)", [nome, telefone], function() { processarVeiculo(this.lastID); });
         }
     });
+});;
+
+// Busca os agendamentos (Mudamos de JOIN para LEFT JOIN para evitar que agendamentos sumam)
+app.get('/api/agenda', checkAuth, (req, res) => {
+    db.all("SELECT a.*, c.nome as cliente, c.telefone, v.placa, v.modelo, s.nome as servico FROM agendamentos a JOIN clientes c ON a.cliente_id = c.id JOIN veiculos v ON a.veiculo_id = v.id LEFT JOIN servicos s ON a.servico_id = s.id WHERE a.status = 'PENDENTE' ORDER BY a.data_agendada ASC", (err, rows) => res.json(rows||[]));
 });
 
+// Iniciar Serviço Agendado (Proteção contra serviço deletado/sem preço)
 app.post('/api/agenda', checkAuth, (req, res) => {
-    const { data_agendada, nome, telefone, placa, modelo, servico_id, obs } = req.body;
+    // Agora recebe os extras
+    const { data_agendada, nome, telefone, placa, modelo, servico_id, obs, servico_extra, valor_extra } = req.body;
     db.get("SELECT id FROM clientes WHERE nome = ?", [nome], (err, cliente) => {
         const processarVeiculo = (clienteId) => {
             db.get("SELECT id FROM veiculos WHERE placa = ?", [placa], (err, veiculo) => {
                 const registrarAgenda = (veiculoId) => {
-                    db.run("INSERT INTO agendamentos (cliente_id, veiculo_id, servico_id, data_agendada, obs) VALUES (?, ?, ?, ?, ?)",
-                    [clienteId, veiculoId, servico_id, data_agendada, obs], (err) => {
+                    db.run("INSERT INTO agendamentos (cliente_id, veiculo_id, servico_id, data_agendada, obs, servico_extra, valor_extra) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    [clienteId, veiculoId, servico_id, data_agendada, obs, servico_extra, valor_extra || 0], (err) => {
                         if (err) return res.status(500).json({ error: err.message });
                         res.json({ success: true });
                     });
@@ -131,8 +139,10 @@ app.post('/api/agenda/:id/iniciar', checkAuth, (req, res) => {
         if(!agd) return res.status(404).json({error:'Não encontrado'});
         db.get("SELECT preco FROM servicos WHERE id = ?", [agd.servico_id], (err, srv) => {
             db.get("SELECT placa FROM veiculos WHERE id = ?", [agd.veiculo_id], (err, veic) => {
-                db.run("INSERT INTO transacoes (cliente_id, veiculo_id, placa_registrada, servico_id, valor_cobrado, forma_pagamento, obs) VALUES (?, ?, ?, ?, ?, 'Pendente', ?)", 
-                [agd.cliente_id, agd.veiculo_id, veic.placa, agd.servico_id, srv.preco, agd.obs], (err) => {
+                const precoFinal = srv ? srv.preco : 0; 
+                // Transfere o extra do agendamento direto para o Pátio (transacoes)
+                db.run("INSERT INTO transacoes (cliente_id, veiculo_id, placa_registrada, servico_id, valor_cobrado, forma_pagamento, obs, servico_extra, valor_extra) VALUES (?, ?, ?, ?, ?, 'Pendente', ?, ?, ?)", 
+                [agd.cliente_id, agd.veiculo_id, veic.placa, agd.servico_id, precoFinal, agd.obs, agd.servico_extra, agd.valor_extra || 0], (err) => {
                     db.run("UPDATE agendamentos SET status = 'CONCLUIDO' WHERE id = ?", [agd.id]);
                     res.json({success:true});
                 });
@@ -142,7 +152,16 @@ app.post('/api/agenda/:id/iniciar', checkAuth, (req, res) => {
 });
 
 app.get('/api/patio/andamento', checkAuth, (req, res) => {
-    db.all("SELECT t.id, t.placa_registrada, c.nome as cliente, c.telefone, s.nome as servico, t.valor_cobrado, t.data_hora, v.modelo, t.obs FROM transacoes t JOIN clientes c ON t.cliente_id = c.id JOIN servicos s ON t.servico_id = s.id LEFT JOIN veiculos v ON t.veiculo_id = v.id WHERE t.status = 'ANDAMENTO' ORDER BY t.data_hora ASC", (err, rows) => res.json(rows||[]));
+    // Adicionado t.servico_id na busca
+   db.all("SELECT t.id, t.placa_registrada, c.nome as cliente, c.telefone, s.nome as servico, t.servico_id, t.valor_cobrado, t.data_hora, v.modelo, t.obs, t.servico_extra, t.valor_extra FROM transacoes t JOIN clientes c ON t.cliente_id = c.id JOIN servicos s ON t.servico_id = s.id LEFT JOIN veiculos v ON t.veiculo_id = v.id WHERE t.status = 'ANDAMENTO' ORDER BY t.data_hora ASC", (err, rows) => res.json(rows||[]));
+});
+
+// Nova rota para salvar a edição do pátio
+app.put('/api/patio/:id', checkAuth, (req, res) => {
+    db.run("UPDATE transacoes SET servico_id = ?, valor_cobrado = ?, obs = ?, servico_extra = ?, valor_extra = ? WHERE id = ?", 
+    [req.body.servico_id, req.body.valor_cobrado, req.body.obs, req.body.servico_extra, req.body.valor_extra || 0, req.params.id], (err) => {
+        if(err) return res.status(500).json({error: err.message}); res.json({success: true});
+    });
 });
 app.put('/api/concluir-servico/:id', checkAuth, (req, res) => {
     db.run("UPDATE transacoes SET status = 'CONCLUIDO', data_conclusao = CURRENT_TIMESTAMP WHERE id = ?", [req.params.id], (err) => {

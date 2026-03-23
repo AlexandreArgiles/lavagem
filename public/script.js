@@ -71,9 +71,30 @@ async function loadPatio(){
     const r1=await fetch(`${API}/patio/andamento`); const a=await r1.json();
     const d=document.getElementById('lista-andamento'); d.innerHTML='';
     if(!a.length) d.innerHTML='<p style="color:#888">Vazio</p>';
-    a.forEach(t=>{
+   a.forEach(t=>{
         const obsHtml = t.obs ? `<p style="font-size:0.8rem; color:#d97706; background:#fef3c7; padding:4px; border-radius:4px; margin-top:5px;">⚠️ ${t.obs}</p>` : '';
-        d.innerHTML+=`<div class="patio-card"><div class="patio-header"><span class="patio-placa">${t.placa_registrada}</span><small>${new Date(t.data_hora).toLocaleTimeString().slice(0,5)}</small></div><div class="patio-body"><p><strong>${t.modelo||'S/ Modelo'}</strong></p><p>👤 ${t.cliente}</p><p>🛠️ ${t.servico}</p><p>💰 ${fmt(t.valor_cobrado)}</p>${obsHtml}</div><button class="btn-primary" style="margin-top:10px" onclick="concluirLavagem(${t.id},'${t.cliente}','${t.telefone}','${t.placa_registrada}',${t.valor_cobrado})">✅ Concluir</button></div>`;
+        const escObs = t.obs ? t.obs.replace(/'/g, "\\'") : ''; 
+        const servicoExtraHtml = t.servico_extra ? `<p>➕ ${t.servico_extra} (R$ ${t.valor_extra || 0})</p>` : '';
+        const valorTotal = Number(t.valor_cobrado) + Number(t.valor_extra || 0);
+        
+        d.innerHTML+=`<div class="patio-card">
+            <div class="patio-header">
+                <span class="patio-placa">${t.placa_registrada}</span>
+                <small>${new Date(t.data_hora).toLocaleTimeString().slice(0,5)}</small>
+            </div>
+            <div class="patio-body">
+                <p><strong>${t.modelo||'S/ Modelo'}</strong></p>
+                <p>👤 ${t.cliente}</p>
+                <p>🛠️ ${t.servico} (R$ ${t.valor_cobrado})</p>
+                ${servicoExtraHtml}
+                <p style="font-weight:bold; font-size:1.1rem;">💰 Total: ${fmt(valorTotal)}</p>
+                ${obsHtml}
+            </div>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn-secondary" style="flex:1; border:none; border-radius:8px; font-weight:bold; background:#e5e7eb; color:#374151; padding: 10px 0;" onclick="abrirEditPatio(${t.id}, ${t.servico_id}, ${t.valor_cobrado}, '${escObs}', '${t.servico_extra || ''}', ${t.valor_extra || 0})">✏️ Editar</button>
+                <button class="btn-primary" style="flex:2; padding: 10px 0;" onclick="concluirLavagem(${t.id},'${t.cliente}','${t.telefone}','${t.placa_registrada}',${valorTotal})">✅ Concluir</button>
+            </div>
+        </div>`;
     });
     const r2=await fetch(`${API}/patio/concluidos-hoje`); const c=await r2.json();
     const tb=document.querySelector('#tabela-patio-concluidos tbody'); tb.innerHTML='';
@@ -98,31 +119,271 @@ async function concluirLavagem(id, n, t, p, v) {
 }function enviarZap(tel, msg) { if(!tel) { showAlert('Cliente sem telefone'); return; } let num = tel.replace(/\D/g, ''); if(num.length === 10 || num.length === 11) num = '55' + num; window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank'); }
 
 let sCache=[], cCache=[];
-async function prepLav(){const[sR,fR]=await Promise.all([fetch(`${API}/servicos`),fetch(`${API}/funcionarios`)]);sCache=await sR.json();const f=await fR.json();const fill=(id)=>{const el=document.getElementById(id);if(el){el.innerHTML='<option value="">...</option>';if(id.includes('servico'))sCache.forEach(s=>el.innerHTML+=`<option value="${s.id}">${s.nome}</option>`);else f.forEach(x=>el.innerHTML+=`<option value="${x.id}">${x.nome}</option>`)}};fill('reg-servico');fill('reg-func');fill('agd-servico');resetLav()}
-function resetLav(){['reg-placa','reg-cliente','reg-tel','reg-modelo','reg-valor','reg-obs'].forEach(id=>document.getElementById(id).value='');document.getElementById('reg-placa').classList.remove('hidden');document.getElementById('reg-placa-select').classList.add('hidden');document.getElementById('reg-modelo').disabled=false;document.getElementById('reg-cliente').disabled=false}
-function atualizarPreco(){const i=sCache.find(x=>x.id==document.getElementById('reg-servico').value);if(i)document.getElementById('reg-valor').value=i.preco}
+async function prepLav(){const[sR,fR]=await Promise.all([fetch(`${API}/servicos`),fetch(`${API}/funcionarios`)]);sCache=await sR.json();const f=await fR.json();const fill=(id)=>{const el=document.getElementById(id);if(el){el.innerHTML='<option value="">...</option>';if(id.includes('servico'))sCache.forEach(s=>el.innerHTML+=`<option value="${s.id}">${s.nome}</option>`);else f.forEach(x=>el.innerHTML+=`<option value="${x.id}">${x.nome}</option>`)}};
+ffill('reg-servico');fill('reg-func');fill('agd-servico');
+    
+    // Alimenta o Datalist de Serviços Extras
+    const dlServicos = document.getElementById('lista-servicos');
+    if(dlServicos) {
+        dlServicos.innerHTML = '';
+        sCache.forEach(s => dlServicos.innerHTML += `<option value="${s.nome}">`);
+    }
+    resetLav();}
+function resetLav(){
+    ['reg-placa','reg-cliente','reg-tel','reg-modelo','reg-valor','reg-obs', 'reg-servico-extra', 'reg-valor-extra'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('reg-placa').classList.remove('hidden');
+    document.getElementById('reg-placa-select').classList.add('hidden');
+    document.getElementById('reg-modelo').disabled=false;
+    document.getElementById('reg-cliente').disabled=false;
+}function atualizarPreco(){const i=sCache.find(x=>x.id==document.getElementById('reg-servico').value);if(i)document.getElementById('reg-valor').value=i.preco}
 async function buscarPlaca(){const p=document.getElementById('reg-placa').value.toUpperCase();if(p.length<5)return;const r=await fetch(`${API}/buscar-placa/${p}`);const d=await r.json();if(d){document.getElementById('reg-modelo').value=d.modelo||'';document.getElementById('reg-cliente').value=d.nome;document.getElementById('reg-tel').value=d.telefone||'';document.getElementById('reg-cliente').disabled=true;document.getElementById('reg-modelo').disabled=true}else{document.getElementById('reg-cliente').disabled=false;document.getElementById('reg-modelo').disabled=false}}
-async function buscarClienteNome(){const inputs=['reg-cliente','agd-cli'];const act=inputs.find(id=>document.activeElement.id===id);if(!act)return;const t=document.getElementById(act).value;if(t.length<3)return;const r=await fetch(`${API}/clientes/autocomplete?q=${t}`);cCache=await r.json();const dl=document.getElementById('sug-cli');dl.innerHTML='';cCache.forEach(c=>{const o=document.createElement('option');o.value=c.nome;dl.appendChild(o)});if(act==='reg-cliente'){const sel=cCache.find(c=>c.nome===t);if(sel){document.getElementById('reg-tel').value=sel.telefone||'';const ip=document.getElementById('reg-placa');const sp=document.getElementById('reg-placa-select');ip.classList.add('hidden');sp.classList.remove('hidden');sp.innerHTML='<option value="">Selecione...</option>';sel.veiculos.forEach(v=>sp.innerHTML+=`<option value="${v.placa}" data-m="${v.modelo}">${v.placa} - ${v.modelo||''}</option>`);sp.innerHTML+='<option value="NOVO">Novo Carro</option>'}}else{const sel=cCache.find(c=>c.nome===t);if(sel)document.getElementById('agd-tel').value=sel.telefone||''}}
+async function buscarClienteNome(){
+    const inputs=['reg-cliente','agd-cli'];
+    const act=inputs.find(id=>document.activeElement.id===id);
+    if(!act)return;
+    const t=document.getElementById(act).value;
+    if(t.length<3)return;
+    
+    const r=await fetch(`${API}/clientes/autocomplete?q=${t}`);
+    cCache=await r.json();
+    
+    const dl=document.getElementById('sug-cli');
+    if(dl) {
+        dl.innerHTML='';
+        cCache.forEach(c=>{const o=document.createElement('option');o.value=c.nome;dl.appendChild(o)});
+    }
+    
+    const sel=cCache.find(c=>c.nome===t);
+    if(!sel) return;
+
+    if(act==='reg-cliente'){
+        document.getElementById('reg-tel').value=sel.telefone||'';
+        const ip=document.getElementById('reg-placa');
+        const sp=document.getElementById('reg-placa-select');
+        ip.classList.add('hidden');
+        sp.classList.remove('hidden');
+        sp.innerHTML='<option value="">Selecione o veículo...</option>';
+        sel.veiculos.forEach(v=>sp.innerHTML+=`<option value="${v.placa}" data-m="${v.modelo}">${v.placa} - ${v.modelo||''}</option>`);
+        sp.innerHTML+='<option value="NOVO">Novo Carro</option>';
+    } else if (act==='agd-cli') {
+        // AGORA PREENCHE A AGENDA TAMBÉM!
+        document.getElementById('agd-tel').value=sel.telefone||'';
+        const ip=document.getElementById('agd-placa');
+        const sp=document.getElementById('agd-placa-select');
+        ip.classList.add('hidden');
+        sp.classList.remove('hidden');
+        sp.innerHTML='<option value="">Selecione o veículo...</option>';
+        sel.veiculos.forEach(v=>sp.innerHTML+=`<option value="${v.placa}" data-m="${v.modelo}">${v.placa} - ${v.modelo||''}</option>`);
+        sp.innerHTML+='<option value="NOVO">Novo Carro</option>';
+    }
+}
+function selCarroAgd(){
+    const s=document.getElementById('agd-placa-select');
+    const v=s.value;
+    if(v==='NOVO'){
+        s.classList.add('hidden');
+        document.getElementById('agd-placa').classList.remove('hidden');
+        document.getElementById('agd-placa').value='';
+        document.getElementById('agd-modelo').value='';
+        document.getElementById('agd-modelo').disabled=false;
+    }else if(v){
+        document.getElementById('agd-placa').value=v;
+        document.getElementById('agd-modelo').value=s.options[s.selectedIndex].getAttribute('data-m')||'';
+        document.getElementById('agd-modelo').disabled=true;
+    }
+}
 function selCarro(){const s=document.getElementById('reg-placa-select');const v=s.value;if(v==='NOVO'){s.classList.add('hidden');document.getElementById('reg-placa').classList.remove('hidden');document.getElementById('reg-modelo').disabled=false}else if(v){document.getElementById('reg-placa').value=v;document.getElementById('reg-modelo').value=s.options[s.selectedIndex].getAttribute('data-m')||'';document.getElementById('reg-modelo').disabled=true}}
 
 async function finalizarLavagem(){
     let p=document.getElementById('reg-placa').value.toUpperCase(); const s=document.getElementById('reg-placa-select');
     if(!s.classList.contains('hidden')&&s.value&&s.value!=='NOVO') p=s.value;
-    const pl={placa:p,modelo:document.getElementById('reg-modelo').value,nome:document.getElementById('reg-cliente').value,telefone:document.getElementById('reg-tel').value,servico_id:document.getElementById('reg-servico').value,funcionario_id:document.getElementById('reg-func').value,valor:document.getElementById('reg-valor').value,pgto:document.getElementById('reg-pgto').value,obs:document.getElementById('reg-obs').value};
-    if(!pl.placa||!pl.nome||!pl.servico_id||!pl.valor){ showAlert('Preencha os campos obrigatórios!'); return; }
+const pl={
+        placa:p,modelo:document.getElementById('reg-modelo').value,nome:document.getElementById('reg-cliente').value,
+        telefone:document.getElementById('reg-tel').value,servico_id:document.getElementById('reg-servico').value,
+        funcionario_id:document.getElementById('reg-func').value,valor:document.getElementById('reg-valor').value,
+        pgto:document.getElementById('reg-pgto').value,obs:document.getElementById('reg-obs').value,
+        servico_extra:document.getElementById('reg-servico-extra').value,
+        valor_extra:document.getElementById('reg-valor-extra').value
+    };    if(!pl.placa||!pl.nome||!pl.servico_id||!pl.valor){ showAlert('Preencha os campos obrigatórios!'); return; }
     const r=await fetch(`${API}/lavagem-rapida`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pl)});
     if(r.ok){showAlert('Veículo registrado no pátio!');navTo('patio')}else showAlert('Erro ao registrar entrada')
 }
 
 // ================== AGENDA (OBS ADICIONADO) ==================
-async function loadAgenda(){const r=await fetch(`${API}/agenda`);const d=await r.json();const v=document.getElementById('lista-agenda');v.innerHTML='';if(!d.length)v.innerHTML='<p style="color:#888">Vazio</p>';d.forEach(a=>{const dt=new Date(a.data_agendada);v.innerHTML+=`<div class="patio-card" style="border-color:#bbf7d0"><div class="patio-header"><span class="patio-placa" style="background:#dcfce7;color:#15803d">${dt.toLocaleTimeString().slice(0,5)} - ${dt.toLocaleDateString()}</span><button class="btn-action btn-delete" onclick="cancelarAgenda(${a.id})">X</button></div><div class="patio-body"><p><strong>${a.placa}</strong> (${a.modelo||''})</p><p>👤 ${a.cliente}</p><p>🛠️ ${a.servico}</p><p style="font-style:italic;font-size:0.8rem;color:#d97706">${a.obs||''}</p></div><button class="btn-primary" style="margin-top:10px;background:#15803d" onclick="iniciarServicoAgendado(${a.id},'${a.placa}')">▶️ Receber Veículo</button></div>`})}
-function abrirModalAgenda(){prepLav();document.getElementById('agendaModal').style.display='flex'}
+// ================== AGENDA & AVISOS AUTOMÁTICOS ==================
+window.listaAgendamentos = [];
+const agendaNotificada = new Set();
+
+async function loadAgenda(){
+    const r=await fetch(`${API}/agenda`);
+    const d=await r.json();
+    window.listaAgendamentos = d; // Guarda na memória para o verificador de tempo
+    const v=document.getElementById('lista-agenda');
+    v.innerHTML='';
+    if(!d.length) v.innerHTML='<p style="color:#888">Vazio</p>';
+    
+d.forEach(a=>{
+        const dt=new Date(a.data_agendada);
+        const servicoExtraHtml = a.servico_extra ? `<p style="color:#0369a1; margin: 3px 0;">➕ ${a.servico_extra} (R$ ${a.valor_extra || 0})</p>` : '';
+
+        v.innerHTML+=`<div class="patio-card" style="border-color:#bbf7d0">
+            <div class="patio-header">
+                <span class="patio-placa" style="background:#dcfce7;color:#15803d">${dt.toLocaleTimeString().slice(0,5)} - ${dt.toLocaleDateString()}</span>
+                <button class="btn-action btn-delete" onclick="cancelarAgenda(${a.id})">X</button>
+            </div>
+            <div class="patio-body">
+                <p><strong>${a.placa}</strong> (${a.modelo||''})</p>
+                <p>👤 ${a.cliente}</p>
+                <p>🛠️ ${a.servico || 'Sem serviço definido'}</p>
+                ${servicoExtraHtml}
+                <p style="font-style:italic;font-size:0.8rem;color:#d97706">${a.obs||''}</p>
+            </div>
+            <button class="btn-primary" style="margin-top:10px;background:#15803d" onclick="iniciarServicoAgendado(${a.id},'${a.placa}')">▶️ Receber Veículo</button>
+        </div>`;
+    });
+}
+
+async function salvarAgendamento(){
+    // Descobre se a placa foi digitada ou escolhida na lista
+    let placaFinal = document.getElementById('agd-placa').value.toUpperCase();
+    const selectPlaca = document.getElementById('agd-placa-select');
+    if(selectPlaca && !selectPlaca.classList.contains('hidden') && selectPlaca.value && selectPlaca.value !== 'NOVO'){
+        placaFinal = selectPlaca.value;
+    }
+
+    const p={
+        data_agendada: document.getElementById('agd-data').value,
+        nome: document.getElementById('agd-cli').value,
+        telefone: document.getElementById('agd-tel').value,
+        placa: placaFinal,
+        modelo: document.getElementById('agd-modelo').value,
+        servico_id: document.getElementById('agd-servico').value,
+        obs: document.getElementById('agd-obs').value,
+        servico_extra: document.getElementById('agd-servico-extra').value,
+        valor_extra: document.getElementById('agd-valor-extra').value
+    };
+    
+    if(!p.data_agendada || !p.nome || !p.placa || !p.servico_id){ 
+        showAlert('Preencha os dados obrigatórios (Data, Cliente, Placa e Serviço)!'); 
+        return; 
+    } 
+    
+    const r=await fetch(`${API}/agenda`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    if(r.ok){
+        showAlert('Agendado com sucesso!');
+        fecharAgenda();
+        loadAgenda();
+    } else {
+        showAlert('Erro ao agendar');
+    }
+}
+
+// ⏰ VIGIA AUTOMÁTICO DE HORÁRIOS (COM HORA OFICIAL DA INTERNET)
+setInterval(async () => {
+    // Só roda se a agenda estiver carregada e com clientes
+    if(!window.listaAgendamentos || window.listaAgendamentos.length === 0) return;
+    
+    let agora;
+    try {
+        // Puxa a hora oficial, blindando o sistema contra computadores com hora errada
+        const resposta = await fetch('https://worldtimeapi.org/api/timezone/America/Sao_Paulo');
+        const dadosHora = await resposta.json();
+        agora = new Date(dadosHora.datetime);
+    } catch (erro) {
+        // Plano B: Se a internet oscilar bem na hora da checagem, usa a hora local para não falhar
+        agora = new Date();
+    }
+    
+    window.listaAgendamentos.forEach(async (a) => {
+        const dt = new Date(a.data_agendada);
+        
+        // Calcula a diferença em minutos do horário atual (da internet) para o horário agendado
+        const difMinutos = (agora - dt) / 1000 / 60;
+        
+        // Se passou de 0 a 15 minutos do horário agendado e ainda não notificamos hoje
+        if (difMinutos >= 0 && difMinutos <= 15 && !agendaNotificada.has(a.id)) {
+            agendaNotificada.add(a.id); // Registra que o alerta já subiu na tela para não ficar repetindo
+            
+            const txtConfirm = `⏰ Atenção! \nO horário do cliente ${a.cliente} (Placa: ${a.placa}) chegou (${dt.toLocaleTimeString().slice(0,5)}).\n\nDeseja enviar uma mensagem no WhatsApp informando que estamos aguardando o veículo?`;
+            
+            if (await showConfirm(txtConfirm)) {
+                const msgZap = `Olá ${a.cliente}! Tudo bem? \n\nAqui é da *SpumaCar*. \n\nPassando para avisar que o seu horário das *${dt.toLocaleTimeString().slice(0,5)}* para o veículo *${a.placa}* acabou de chegar! \n\nEstamos aguardando você aqui. Qualquer imprevisto, é só nos dar um toque!`;
+                enviarZap(a.telefone, msgZap);
+            }
+        }
+    });
+}, 30000);
+async function abrirModalAgenda() {
+    // 1. Abre a janela primeiro para dar resposta imediata ao utilizador
+    document.getElementById('agendaModal').style.display = 'flex';
+    
+    try {
+        // 2. Vai buscar a lista de serviços atualizada ao backend
+        const sR = await fetch(`${API}/servicos`);
+        sCache = await sR.json();
+        
+        // 3. Preenche o menu suspenso (dropdown) do Serviço Principal
+        const selectServico = document.getElementById('agd-servico');
+        if (selectServico) {
+            selectServico.innerHTML = '<option value="">Selecione um serviço...</option>';
+            sCache.forEach(s => {
+                selectServico.innerHTML += `<option value="${s.id}">${s.nome} (R$ ${s.preco})</option>`;
+            });
+        }
+
+        // 4. Preenche as sugestões do Serviço Extra
+        const dlServicos = document.getElementById('lista-servicos');
+        if (dlServicos) {
+            dlServicos.innerHTML = '';
+            sCache.forEach(s => {
+                dlServicos.innerHTML += `<option value="${s.nome}">`;
+            });
+        }
+    } catch (erro) {
+        console.error("Erro ao carregar os serviços na agenda:", erro);
+        showAlert("Não foi possível carregar os serviços. Verifique a sua ligação.");
+    }
+    
+    // 5. Limpa todos os campos para não trazer lixo do agendamento anterior
+    ['agd-data', 'agd-cli', 'agd-tel', 'agd-placa', 'agd-modelo', 'agd-obs', 'agd-servico-extra', 'agd-valor-extra'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.value = '';
+    });
+    document.getElementById('agd-placa').classList.remove('hidden');
+    const spAgd = document.getElementById('agd-placa-select');
+    if(spAgd) spAgd.classList.add('hidden');
+    document.getElementById('agd-modelo').disabled = false;
+    // Assegura que o menu selecionado volta à opção inicial (vazia)
+    const resetServico = document.getElementById('agd-servico');
+    if(resetServico) resetServico.value = '';
+}
 function fecharAgenda(){document.getElementById('agendaModal').style.display='none'}
 async function salvarAgendamento(){
-    const p={data_agendada:document.getElementById('agd-data').value,nome:document.getElementById('agd-cli').value,telefone:document.getElementById('agd-tel').value,placa:document.getElementById('agd-placa').value.toUpperCase(),modelo:document.getElementById('agd-modelo').value,servico_id:document.getElementById('agd-servico').value,obs:document.getElementById('agd-obs').value};
-    if(!p.data_agendada||!p.nome||!p.placa){ showAlert('Preencha os dados obrigatórios!'); return; } 
+    const p={
+        data_agendada: document.getElementById('agd-data').value,
+        nome: document.getElementById('agd-cli').value,
+        telefone: document.getElementById('agd-tel').value,
+        placa: document.getElementById('agd-placa').value.toUpperCase(),
+        modelo: document.getElementById('agd-modelo').value,
+        servico_id: document.getElementById('agd-servico').value,
+        obs: document.getElementById('agd-obs').value,
+        servico_extra: document.getElementById('agd-servico-extra').value,
+        valor_extra: document.getElementById('agd-valor-extra').value
+    };
+    
+    if(!p.data_agendada || !p.nome || !p.placa || !p.servico_id){ 
+        showAlert('Preencha os dados obrigatórios (Data, Cliente, Placa e Serviço)!'); 
+        return; 
+    } 
+    
     const r=await fetch(`${API}/agenda`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
-    if(r.ok){showAlert('Agendado com sucesso!');fecharAgenda();loadAgenda()}else showAlert('Erro ao agendar')
+    if(r.ok){
+        showAlert('Agendado com sucesso!');
+        fecharAgenda();
+        loadAgenda();
+    } else {
+        showAlert('Erro ao agendar');
+    }
 }
 async function iniciarServicoAgendado(id,p){if(!await showConfirm(`Receber veículo ${p} no pátio?`))return;const r=await fetch(`${API}/agenda/${id}/iniciar`,{method:'POST'});if(r.ok){showAlert('Veículo movido para o Pátio!');navTo('patio')}else showAlert('Erro ao iniciar')}
 async function cancelarAgenda(id){if(!await showConfirm('Cancelar este agendamento?'))return;await fetch(`${API}/agenda/${id}`,{method:'DELETE'});loadAgenda()}
@@ -254,3 +515,64 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
         }
     });
 });
+// ================== EDIÇÃO NO PÁTIO ==================
+async function abrirEditPatio(id, servico_id, valor, obs, serv_extra, val_extra) {
+    document.getElementById('ep-id').value = id;
+    document.getElementById('ep-valor').value = valor;
+    document.getElementById('ep-obs').value = obs !== 'undefined' ? obs : '';
+    document.getElementById('ep-servico-extra').value = serv_extra !== 'undefined' ? serv_extra : '';
+    document.getElementById('ep-valor-extra').value = val_extra;
+    
+    // Garante que a lista de serviços foi carregada
+    if(sCache.length === 0) {
+        const sR = await fetch(`${API}/servicos`);
+        sCache = await sR.json();
+    }
+    
+    // Alimenta o datalist caso ainda não tenha sido
+    const dlServicos = document.getElementById('lista-servicos');
+    if(dlServicos && dlServicos.innerHTML === '') {
+        sCache.forEach(s => dlServicos.innerHTML += `<option value="${s.nome}">`);
+    }
+
+    const sel = document.getElementById('ep-servico');
+    sel.innerHTML = '';
+    sCache.forEach(s => {
+        sel.innerHTML += `<option value="${s.id}" ${s.id == servico_id ? 'selected' : ''}>${s.nome}</option>`;
+    });
+    
+    document.getElementById('editPatioModal').style.display = 'flex';
+}
+
+function fecharEditPatio() {
+    document.getElementById('editPatioModal').style.display = 'none';
+}
+
+function atualizarPrecoPatio() {
+    const i = sCache.find(x => x.id == document.getElementById('ep-servico').value);
+    if(i) document.getElementById('ep-valor').value = i.preco;
+}
+
+async function salvarEditPatio() {
+    const id = document.getElementById('ep-id').value;
+    const body = {
+        servico_id: document.getElementById('ep-servico').value,
+        valor_cobrado: document.getElementById('ep-valor').value,
+        obs: document.getElementById('ep-obs').value,
+        servico_extra: document.getElementById('ep-servico-extra').value,
+        valor_extra: document.getElementById('ep-valor-extra').value
+    };
+    
+    const r = await fetch(`${API}/patio/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    });
+    
+    if(r.ok) {
+        fecharEditPatio();
+        loadPatio();
+    } else {
+        showAlert('Erro ao atualizar o serviço!');
+    }
+}
