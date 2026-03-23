@@ -241,3 +241,16 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDash(); 
     carregarIpRede(); 
 });
+// ================== CONTROLE DO MENU MOBILE ==================
+function toggleMenu() {
+    document.querySelector('.sidebar').classList.toggle('show');
+}
+
+// Garante que o menu vai fechar automaticamente ao clicar em alguma opção
+document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if(window.innerWidth <= 768) {
+            document.querySelector('.sidebar').classList.remove('show');
+        }
+    });
+});

@@ -126,3 +126,54 @@ td { padding: 16px; border-bottom: 1px solid var(--border); color: var(--text-ma
 .patio-card { background: white; border: 1px solid #fed7aa; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 .patio-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .patio-placa { font-weight: bold; font-size: 1.1rem; color: #c2410c; background: #ffedd5; padding: 2px 6px; border-radius: 4px; }
+/* ================== RESPONSIVIDADE (CELULAR) ================== */
+.mobile-header {
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--primary);
+    color: white;
+    padding: 15px 20px;
+    box-shadow: var(--shadow);
+    z-index: 1000;
+}
+.mobile-header .brand { color: white; margin: 0; font-size: 1.4rem; }
+.menu-toggle { background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+
+/* Regras aplicadas APENAS em telas menores que 768px */
+@media (max-width: 768px) {
+    body { flex-direction: column; overflow: auto; height: auto; min-height: 100vh; }
+    .mobile-header { display: flex; }
+    
+    /* Transforma a Sidebar em um Menu Deslizante */
+    .sidebar { 
+        position: fixed; top: 61px; left: -100%; width: 100%; height: calc(100vh - 61px);
+        z-index: 999; transition: left 0.3s ease; border-right: none;
+    }
+    .sidebar.show { left: 0; }
+    
+    /* Oculta as informações repetidas no menu mobile */
+    .sidebar-header .brand { display: none; }
+    .sidebar-footer { padding-bottom: 30px; }
+
+    /* Ajuste do Conteúdo Principal para não ficar espremido */
+    .content { padding: 15px; flex: none; overflow-y: visible; }
+    
+    /* Faz os formulários e cards ocuparem a tela toda */
+    .form-grid { grid-template-columns: 1fr; }
+    .full-width { grid-column: span 1; }
+    .stats-grid { grid-template-columns: 1fr; }
+    .charts-container { flex-direction: column; }
+    
+    /* Ajuste de Tabelas para não quebrarem o layout (permite scroll para o lado) */
+    .table-container { overflow-x: auto; }
+    table { white-space: nowrap; }
+    
+    /* Botões e Flex-rows */
+    .flex-row { flex-direction: column; align-items: stretch; gap: 15px; }
+    .auto-width { width: 100%; }
+    .btn-end-align { align-items: stretch; }
+    
+    /* Modais */
+    .modal-content { width: 95%; padding: 20px; }
+}
