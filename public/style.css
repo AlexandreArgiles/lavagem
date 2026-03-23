@@ -177,3 +177,26 @@ td { padding: 16px; border-bottom: 1px solid var(--border); color: var(--text-ma
     /* Modais */
     .modal-content { width: 95%; padding: 20px; }
 }
+
+/* ================== ESTILOS DA LOGO ================== */
+/* ================== ESTILOS DA MARCA (LOGO + TEXTO) ================== */
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px; /* Espaço entre o ícone e o texto */
+    font-size: 1.4rem;
+    font-weight: bold;
+}
+
+.logo-img {
+    width: 40px; /* Reduzido para caber ao lado do texto */
+    height: 40px;
+    object-fit: contain;
+}
+
+.login-logo {
+    max-width: 200px;
+    height: auto;
+    margin: 0 auto 20px auto; /* Centraliza na tela de login e dá um espaço embaixo */
+    display: block;
+}

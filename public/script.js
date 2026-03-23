@@ -90,9 +90,10 @@ async function loadPatio(){
                 <p style="font-weight:bold; font-size:1.1rem;">💰 Total: ${fmt(valorTotal)}</p>
                 ${obsHtml}
             </div>
-            <div style="display:flex; gap:10px; margin-top:15px;">
-                <button class="btn-secondary" style="flex:1; border:none; border-radius:8px; font-weight:bold; background:#e5e7eb; color:#374151; padding: 10px 0;" onclick="abrirEditPatio(${t.id}, ${t.servico_id}, ${t.valor_cobrado}, '${escObs}', '${t.servico_extra || ''}', ${t.valor_extra || 0})">✏️ Editar</button>
-                <button class="btn-primary" style="flex:2; padding: 10px 0;" onclick="concluirLavagem(${t.id},'${t.cliente}','${t.telefone}','${t.placa_registrada}',${valorTotal})">✅ Concluir</button>
+            <div style="display:flex; gap:10px; margin-top:15px; flex-wrap: wrap;">
+                <button class="btn-secondary" style="flex:1; min-width:80px; border:none; border-radius:8px; font-weight:bold; background:#e5e7eb; color:#374151; padding: 10px 0;" onclick="abrirEditPatio(${t.id}, ${t.servico_id}, ${t.valor_cobrado}, '${escObs}', '${t.servico_extra || ''}', ${t.valor_extra || 0})">✏️ Editar</button>
+                <button class="btn-primary" style="flex:2; min-width:120px; padding: 10px 0;" onclick="concluirLavagem(${t.id},'${t.cliente}','${t.telefone}','${t.placa_registrada}',${valorTotal})">✅ Concluir</button>
+                <button style="flex:1; min-width:100px; border:none; border-radius:8px; font-weight:bold; background:#fee2e2; color:#ef4444; padding: 10px 0; cursor:pointer;" onclick="cancelarPatio(${t.id}, '${t.placa_registrada}')">🗑️ Cancelar</button>
             </div>
         </div>`;
     });
@@ -229,8 +230,7 @@ d.forEach(a=>{
         v.innerHTML+=`<div class="patio-card" style="border-color:#bbf7d0">
             <div class="patio-header">
                 <span class="patio-placa" style="background:#dcfce7;color:#15803d">${dt.toLocaleTimeString().slice(0,5)} - ${dt.toLocaleDateString()}</span>
-                <button class="btn-action btn-delete" onclick="cancelarAgenda(${a.id})">X</button>
-            </div>
+                <button class="btn-action btn-delete" style="padding: 5px 10px; font-weight:bold; border-radius:6px;" onclick="cancelarAgenda(${a.id})">🗑️ Cancelar</button>            </div>
             <div class="patio-body">
                 <p><strong>${a.placa}</strong> (${a.modelo||''})</p>
                 <p>👤 ${a.cliente}</p>
@@ -285,12 +285,13 @@ setInterval(async () => {
     
     let agora;
     try {
-        // Puxa a hora oficial, blindando o sistema contra computadores com hora errada
-        const resposta = await fetch('https://worldtimeapi.org/api/timezone/America/Sao_Paulo');
+        // Trocamos para a TimeAPI (mais rápida e com certificado de segurança mais moderno)
+        const resposta = await fetch('https://timeapi.io/api/Time/current/zone?timeZone=America/Sao_Paulo');
         const dadosHora = await resposta.json();
-        agora = new Date(dadosHora.datetime);
+        // A TimeAPI usa o campo com "T" maiúsculo: dateTime
+        agora = new Date(dadosHora.dateTime);
     } catch (erro) {
-        // Plano B: Se a internet oscilar bem na hora da checagem, usa a hora local para não falhar
+        // Plano B: Usa a hora do PC silenciosamente
         agora = new Date();
     }
     
@@ -574,5 +575,18 @@ async function salvarEditPatio() {
         loadPatio();
     } else {
         showAlert('Erro ao atualizar o serviço!');
+    }
+}
+// ================== CANCELAMENTO NO PÁTIO ==================
+async function cancelarPatio(id, placa) {
+    if(!await showConfirm(`Tem certeza que deseja CANCELAR a entrada do veículo ${placa}? O registro será apagado do sistema.`)) return;
+    
+    const r = await fetch(`${API}/patio/${id}`, { method: 'DELETE' });
+    
+    if(r.ok) {
+        showAlert('Entrada cancelada com sucesso!');
+        loadPatio();
+    } else {
+        showAlert('Erro ao cancelar o registro.');
     }
 }

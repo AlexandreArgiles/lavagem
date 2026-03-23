@@ -163,6 +163,13 @@ app.put('/api/patio/:id', checkAuth, (req, res) => {
         if(err) return res.status(500).json({error: err.message}); res.json({success: true});
     });
 });
+// Rota para cancelar/excluir um carro que foi lançado errado no pátio
+app.delete('/api/patio/:id', checkAuth, (req, res) => {
+    db.run("DELETE FROM transacoes WHERE id = ? AND status = 'ANDAMENTO'", [req.params.id], (err) => {
+        if(err) return res.status(500).json({error: err.message}); 
+        res.json({success: true});
+    });
+});
 app.put('/api/concluir-servico/:id', checkAuth, (req, res) => {
     db.run("UPDATE transacoes SET status = 'CONCLUIDO', data_conclusao = CURRENT_TIMESTAMP WHERE id = ?", [req.params.id], (err) => {
         if(err) return res.status(500).json({error: err.message}); res.json({success: true});
@@ -307,6 +314,22 @@ app.get('/api/rh/extrato', checkAuth, checkAdmin, (req, res) => {
     db.all(`SELECT r.id, r.tipo, r.descricao, r.valor, r.data_evento, f.nome as funcionario FROM rh_eventos r JOIN funcionarios f ON r.funcionario_id = f.id WHERE strftime('%Y-%m', r.data_evento) = ? ORDER BY r.data_evento DESC`, [req.query.mes], (e, rows) => res.json(rows || []));
 });
 app.delete('/api/rh/:id', checkAuth, checkAdmin, (req, res) => { db.run("DELETE FROM rh_eventos WHERE id=?", [req.params.id], () => res.json({success:true})); });
+
+// ================== ROTA DE EMERGÊNCIA ==================
+app.get('/api/limpar-fantasmas', (req, res) => {
+    // Essa rota procura e deleta qualquer carro "Em andamento" que tenha perdido o Cliente ou o Serviço no banco de dados
+    db.run(`DELETE FROM transacoes WHERE status = 'ANDAMENTO' AND (cliente_id NOT IN (SELECT id FROM clientes) OR servico_id NOT IN (SELECT id FROM servicos))`, (err) => {
+        if(err) return res.send("Erro: " + err.message);
+        
+        res.send(`
+            <div style="font-family: sans-serif; text-align: center; margin-top: 50px;">
+                <h1 style="color: #10b981;">✨ Limpeza Concluída!</h1>
+                <p>Os carros fantasmas foram removidos do seu pátio com sucesso.</p>
+                <a href="/" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 8px;">Voltar para o Sistema</a>
+            </div>
+        `);
+    });
+});
 
 // ================== REDE LOCAL ==================
 app.get('/api/rede', (req, res) => {
