@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "electron .",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -28,7 +29,13 @@
       "output": "dist"
     },
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        }
+      ],
+      "icon": "public/favicon.ico"
     },
     "nsis": {
       "oneClick": true,

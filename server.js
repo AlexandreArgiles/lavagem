@@ -50,7 +50,8 @@ app.post('/api/setup', async (req, res) => {
 
 app.post('/api/login', (req, res) => {
     const { login, senha } = req.body;
-    db.get("SELECT * FROM usuarios WHERE login = ?", [login], async (err, user) => {
+    // Usamos LOWER() tanto na coluna do banco quanto no texto digitado para garantir a igualdade
+    db.get("SELECT * FROM usuarios WHERE LOWER(login) = LOWER(?)", [login], async (err, user) => {
         if (!user || !(await bcrypt.compare(senha, user.senha))) return res.status(401).json({ error: 'Credenciais inválidas' });
         req.session.userId = user.id;
         req.session.userRole = user.perfil;
